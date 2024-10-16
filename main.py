@@ -5,26 +5,44 @@ import cv2
 from PIL import Image
 from flask import Flask, Response, request, jsonify
 from googletrans import Translator
+import os
+import time
 
 app = Flask(__name__)
 
-# Nạp mô hình từ file model.pkl
-with open('model.pkl', 'rb') as model_file:
-    model = pickle.load(model_file)
+# # Kiểm tra xem mô hình có tồn tại không trước khi nạp
+# model = None
+# model_file_path = 'model.pkl'
 
-# Tạo một instance của Google Translator (hoặc API dịch khác)
+# if os.path.exists(model_file_path):
+#     try:
+#         with open(model_file_path, 'rb') as model_file:
+#             model = pickle.load(model_file)
+#         print("Mô hình đã được nạp thành công.")
+#     except Exception as e:
+#         print(f"Lỗi khi nạp mô hình: {e}")
+# else:
+#     print("Tệp mô hình không tồn tại. Sẽ sử dụng mô hình giả định.")
+
+# Tạo một instance của Google Translator
 translator = Translator()
 
 # Đường dẫn RTSP của camera
 rtsp_url = 'rtsp://Cuonggustav@gmail.com:Cuongqb137@@192.168.2.30:554/stream1'
 
 # Tạo video stream từ camera
+# Tạo video stream từ camera
 def generate_video_stream():
     cap = cv2.VideoCapture(rtsp_url)
+
     while True:
         success, frame = cap.read()
         if not success:
-            break
+            print("Không thể đọc khung hình từ camera, đang thử lại...")
+            cap.release()  # Giải phóng camera trước khi thử lại
+            cap = cv2.VideoCapture(rtsp_url)  # Thử lại kết nối
+            continue  # Thử lại vòng lặp
+        
         _, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
@@ -63,8 +81,15 @@ def upload_image():
 
 def model_predict(image):
     # Thực hiện xử lý hình ảnh và gọi mô hình
-    # Ví dụ trả về text từ ảnh (bạn cần thay thế hàm này bằng hàm tương ứng với model của bạn)
-    text_result = "Example text from model"  # Thay thế với code thực tế để lấy text từ hình ảnh
+    # if model is not None:
+    #     # Gọi hàm dự đoán của mô hình của bạn (cần thay thế hàm này với code thực tế)
+    #     # result = model.predict(image)
+    #     text_result = "Example text from model"  # Giả định kết quả từ mô hình
+    # else:
+    #     # Nếu mô hình không được nạp, trả về kết quả giả định
+    #     text_result = "Model not loaded, using placeholder text."  # Thay thế bằng văn bản bạn muốn trả về
+    
+    text_result = "This is a placeholder text from the model."  # Văn bản giả định
     return text_result
 
 if __name__ == '__main__':
