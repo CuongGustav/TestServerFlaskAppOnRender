@@ -16,7 +16,7 @@ with open('model.pkl', 'rb') as model_file:
 translator = Translator()
 
 # Đường dẫn RTSP của camera
-rtsp_url = 'rtsp://username:password@camera-ip-address:554/stream1'
+rtsp_url = 'rtsp://Cuonggustav@gmail.com:Cuongqb137@@192.168.2.30:554/stream1'
 
 # Tạo video stream từ camera
 def generate_video_stream():
