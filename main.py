@@ -42,7 +42,10 @@ def upload_image():
     image_data = data['image']
 
     # Decode hình ảnh từ chuỗi base64
-    image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+    try:
+        image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+    except Exception as e:
+        return jsonify({'message': 'Failed to decode image', 'error': str(e)}), 400
 
     # Chuyển đổi hình ảnh qua mô hình (model.predict)
     result_english = model_predict(image)
@@ -52,9 +55,11 @@ def upload_image():
 
     # Trả về kết quả cho web client
     return jsonify({
+        'message': 'Image received and processed successfully',  # Thông báo trạng thái
         'english_text': result_english,
         'vietnamese_text': result_vietnamese
     })
+
 
 def model_predict(image):
     # Thực hiện xử lý hình ảnh và gọi mô hình
