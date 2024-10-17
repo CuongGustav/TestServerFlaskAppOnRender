@@ -1,52 +1,57 @@
-import pickle
 import base64
 import io
 import cv2
 from PIL import Image
 from flask import Flask, Response, request, jsonify
 from googletrans import Translator
-import os
 import time
+from flask_cors import CORS  # Thêm vào để xử lý CORS
 
 app = Flask(__name__)
-
-# # Kiểm tra xem mô hình có tồn tại không trước khi nạp
-# model = None
-# model_file_path = 'model.pkl'
-
-# if os.path.exists(model_file_path):
-#     try:
-#         with open(model_file_path, 'rb') as model_file:
-#             model = pickle.load(model_file)
-#         print("Mô hình đã được nạp thành công.")
-#     except Exception as e:
-#         print(f"Lỗi khi nạp mô hình: {e}")
-# else:
-#     print("Tệp mô hình không tồn tại. Sẽ sử dụng mô hình giả định.")
+CORS(app)  # Kích hoạt CORS
 
 # Tạo một instance của Google Translator
 translator = Translator()
 
 # Đường dẫn RTSP của camera
-rtsp_url = 'rtsp://Cuonggustav@gmail.com:Cuongqb137@@192.168.2.30:554/stream1'
+rtsp_url = 'rtsp://Cuonggustav@gmail.com:Cuongqb137@@172.20.10.2:554/stream1'
 
-# Tạo video stream từ camera
+# Route chính
+@app.route('/')
+def index():
+    return "Hello, this is the main page of the Flask application!"
+
 # Tạo video stream từ camera
 def generate_video_stream():
-    cap = cv2.VideoCapture(rtsp_url)
+    retry_count = 0  # Đếm số lần thử lại
+    max_retries = 5  # Số lần thử lại tối đa
 
     while True:
-        success, frame = cap.read()
-        if not success:
-            print("Không thể đọc khung hình từ camera, đang thử lại...")
-            cap.release()  # Giải phóng camera trước khi thử lại
-            cap = cv2.VideoCapture(rtsp_url)  # Thử lại kết nối
-            continue  # Thử lại vòng lặp
-        
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        cap = cv2.VideoCapture(rtsp_url)
+
+        if not cap.isOpened():
+            print("Không thể mở camera, kiểm tra lại đường dẫn RTSP.")
+            time.sleep(5)  # Đợi 5 giây trước khi thử lại
+            continue
+
+        while True:
+            success, frame = cap.read()
+            if not success:
+                retry_count += 1
+                print("Không thể đọc khung hình từ camera, đang thử lại...")
+                if retry_count >= max_retries:
+                    print("Đã thử quá nhiều lần, không thể kết nối đến camera.")
+                    cap.release()  # Giải phóng camera
+                    break  # Thoát khỏi vòng lặp
+                time.sleep(2)  # Đợi 2 giây trước khi thử lại
+                cap.release()  # Giải phóng camera trước khi thử lại
+                break  # Thoát khỏi vòng lặp để thử lại kết nối
+            else:
+                retry_count = 0  # Reset retry count khi thành công
+                _, buffer = cv2.imencode('.jpg', frame)
+                frame = buffer.tobytes()
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 @app.route('/video_feed')
 def video_feed():
@@ -55,40 +60,42 @@ def video_feed():
 
 @app.route('/upload_image', methods=['POST'])
 def upload_image():
-    # Nhận dữ liệu hình ảnh từ web client
+    print("Nhận yêu cầu từ client...")  # Thêm log
     data = request.json
+    print('Nhận dữ liệu từ client:', data)  # In ra dữ liệu nhận được
+
+    if not data or 'image' not in data:
+        print("Không có dữ liệu hình ảnh nào được nhận.")
+        return jsonify({'message': 'No image data received'}), 400
+    
     image_data = data['image']
 
     # Decode hình ảnh từ chuỗi base64
     try:
         image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+        print("Hình ảnh đã được giải mã thành công.")  # Thêm log
     except Exception as e:
+        print(f'Không thể giải mã hình ảnh: {e}')  # Log lỗi
         return jsonify({'message': 'Failed to decode image', 'error': str(e)}), 400
 
-    # Chuyển đổi hình ảnh qua mô hình (model.predict)
+    # Gọi mô hình xử lý hình ảnh
     result_english = model_predict(image)
+    print("Văn bản tiếng Anh đã nhận diện:", result_english)  # Thêm log
 
     # Dịch văn bản từ tiếng Anh sang tiếng Việt
     result_vietnamese = translator.translate(result_english, src='en', dest='vi').text
+    print("Văn bản tiếng Việt đã dịch:", result_vietnamese)  # Thêm log
 
     # Trả về kết quả cho web client
     return jsonify({
-        'message': 'Image received and processed successfully',  # Thông báo trạng thái
+        'message': 'Image received and processed successfully',
         'english_text': result_english,
         'vietnamese_text': result_vietnamese
     })
 
-
 def model_predict(image):
     # Thực hiện xử lý hình ảnh và gọi mô hình
-    # if model is not None:
-    #     # Gọi hàm dự đoán của mô hình của bạn (cần thay thế hàm này với code thực tế)
-    #     # result = model.predict(image)
-    #     text_result = "Example text from model"  # Giả định kết quả từ mô hình
-    # else:
-    #     # Nếu mô hình không được nạp, trả về kết quả giả định
-    #     text_result = "Model not loaded, using placeholder text."  # Thay thế bằng văn bản bạn muốn trả về
-    
+    # Giả định là mô hình nhận diện văn bản từ hình ảnh
     text_result = "This is a placeholder text from the model."  # Văn bản giả định
     return text_result
 
