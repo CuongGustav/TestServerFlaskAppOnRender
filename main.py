@@ -2,7 +2,7 @@ import base64
 import io
 import cv2
 from PIL import Image
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response, request, jsonify, render_template
 from googletrans import Translator
 import time
 from flask_cors import CORS  # Thêm vào để xử lý CORS
@@ -18,8 +18,13 @@ rtsp_url = 'rtsp://Cuonggustav@gmail.com:Cuongqb137@@172.20.10.2:554/stream1'
 
 # Route chính
 @app.route('/')
+# def index():
+#     return "Hello, this is the main page of the Flask application!"
+
+@app.route('/')
 def index():
-    return "Hello, this is the main page of the Flask application!"
+    return render_template('index.html')
+
 
 # Tạo video stream từ camera
 # def generate_video_stream():
