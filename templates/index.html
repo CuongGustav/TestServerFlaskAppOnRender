@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luồng Video Thời Gian Thực</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        img {
+            max-width: 70%;
+            border: 2px solid #000;
+        }
+        button {
+            margin: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        #result {
+            margin-top: 20px;
+            color: green;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Luồng Video Thời Gian Thực</h1>
+    <img src="https://testserverflaskapponrender.onrender.com/video_feed" alt="Video Stream" id="videoStream" crossOrigin="anonymous">
+
+    <button id="translateButton">Dịch</button>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('translateButton').addEventListener('click', function() {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const videoStream = document.getElementById('videoStream');
+
+            // Cài đặt kích thước canvas bằng kích thước của video
+            canvas.width = videoStream.naturalWidth;
+            canvas.height = videoStream.naturalHeight;
+
+            // Vẽ hình ảnh từ video lên canvas
+            context.drawImage(videoStream, 0, 0);
+
+            // Chuyển đổi canvas thành dữ liệu hình ảnh base64
+            canvas.toBlob(function(blob) {
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    const base64data = reader.result.split(',')[1];  // Lấy dữ liệu base64
+                    const data = {
+                        image: base64data
+                    };
+
+                    console.log('Gửi dữ liệu hình ảnh:', data);  // Thêm log để kiểm tra dữ liệu gửi đi
+
+                    // Gửi ảnh lên server
+                    fetch('https://testserverflaskapponrender.onrender.com/upload_image', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => {
+                        // Kiểm tra xem server có phản hồi thành công không
+                        if (!response.ok) {
+                            throw new Error('Mã lỗi: ' + response.status);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Hiển thị kết quả từ server
+                        document.getElementById('result').innerHTML = `Kết quả tiếng Anh: ${data.english_text}<br>Kết quả tiếng Việt: ${data.vietnamese_text}`;
+                    })
+                    .catch(error => {
+                        console.error('Lỗi:', error);
+                        document.getElementById('result').innerHTML = 'Có lỗi xảy ra khi gửi yêu cầu.';
+                    });
+                };
+                reader.readAsDataURL(blob);  // Chuyển đổi blob thành base64
+            });
+        });
+    </script>
+</body>
+</html>

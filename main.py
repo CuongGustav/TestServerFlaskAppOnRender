@@ -22,36 +22,54 @@ def index():
     return "Hello, this is the main page of the Flask application!"
 
 # Tạo video stream từ camera
+# def generate_video_stream():
+#     retry_count = 0  # Đếm số lần thử lại
+#     max_retries = 5  # Số lần thử lại tối đa
+
+#     while True:
+#         cap = cv2.VideoCapture(rtsp_url)
+
+#         if not cap.isOpened():
+#             print("Không thể mở camera, kiểm tra lại đường dẫn RTSP.")
+#             time.sleep(5)  # Đợi 5 giây trước khi thử lại
+#             continue
+
+#         while True:
+#             success, frame = cap.read()
+#             if not success:
+#                 retry_count += 1
+#                 print("Không thể đọc khung hình từ camera, đang thử lại...")
+#                 if retry_count >= max_retries:
+#                     print("Đã thử quá nhiều lần, không thể kết nối đến camera.")
+#                     cap.release()  # Giải phóng camera
+#                     break  # Thoát khỏi vòng lặp
+#                 time.sleep(2)  # Đợi 2 giây trước khi thử lại
+#                 cap.release()  # Giải phóng camera trước khi thử lại
+#                 break  # Thoát khỏi vòng lặp để thử lại kết nối
+#             else:
+#                 retry_count = 0  # Reset retry count khi thành công
+#                 _, buffer = cv2.imencode('.jpg', frame)
+#                 frame = buffer.tobytes()
+#                 yield (b'--frame\r\n'
+#                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 def generate_video_stream():
-    retry_count = 0  # Đếm số lần thử lại
-    max_retries = 5  # Số lần thử lại tối đa
+    print("Bắt đầu kết nối với camera...")
+    cap = cv2.VideoCapture(rtsp_url)
+    if not cap.isOpened():
+        print("Không thể mở kết nối với camera.")
+        return
 
+    print("Kết nối thành công. Bắt đầu phát video...")
     while True:
-        cap = cv2.VideoCapture(rtsp_url)
+        success, frame = cap.read()
+        if not success:
+            print("Không thể đọc khung hình từ camera.")
+            break
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
-        if not cap.isOpened():
-            print("Không thể mở camera, kiểm tra lại đường dẫn RTSP.")
-            time.sleep(5)  # Đợi 5 giây trước khi thử lại
-            continue
-
-        while True:
-            success, frame = cap.read()
-            if not success:
-                retry_count += 1
-                print("Không thể đọc khung hình từ camera, đang thử lại...")
-                if retry_count >= max_retries:
-                    print("Đã thử quá nhiều lần, không thể kết nối đến camera.")
-                    cap.release()  # Giải phóng camera
-                    break  # Thoát khỏi vòng lặp
-                time.sleep(2)  # Đợi 2 giây trước khi thử lại
-                cap.release()  # Giải phóng camera trước khi thử lại
-                break  # Thoát khỏi vòng lặp để thử lại kết nối
-            else:
-                retry_count = 0  # Reset retry count khi thành công
-                _, buffer = cv2.imencode('.jpg', frame)
-                frame = buffer.tobytes()
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 @app.route('/video_feed')
 def video_feed():
