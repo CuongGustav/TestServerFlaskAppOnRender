@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luồng Video Thời Gian Thực</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        img {
+            max-width: 70%;
+            border: 2px solid #000;
+        }
+        button {
+            margin: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        table {
+            margin-top: 20px;
+            border-collapse: collapse;
+            width: 70%;  /* Đặt chiều rộng của bảng */
+            margin-bottom: 40px;
+        }
+        th, td {
+            border: 1px solid #000;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top; /* Căn chỉnh nội dung lên trên */
+        }
+        th {
+            background-color: #f2f2f2; /* Màu nền cho tiêu đề */
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>Luồng Video Thời Gian Thực</h1>
+    </div>
+    <img src="http://127.0.0.1:5000/video_feed" alt="Video Stream" id="videoStream" crossOrigin="anonymous">
+
+    <button id="translateButton">Dịch</button>
+
+    <!-- Thêm bảng để hiển thị kết quả -->
+    <table id="resultTable">
+        <thead>
+            <tr>
+                <th>Kết quả tiếng Anh</th>
+                <th>Kết quả tiếng Việt</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td id="englishResult"></td>
+                <td id="vietnameseResult"></td>
+            </tr>
+        </tbody>
+    </table>
+    <p>a</p>
+
+    <script>
+        document.getElementById('translateButton').addEventListener('click', function() {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const videoStream = document.getElementById('videoStream');
+
+            // Cài đặt kích thước canvas bằng kích thước của video
+            canvas.width = videoStream.naturalWidth;
+            canvas.height = videoStream.naturalHeight;
+
+            // Vẽ hình ảnh từ video lên canvas
+            context.drawImage(videoStream, 0, 0);
+
+            // Chuyển đổi canvas thành dữ liệu hình ảnh base64
+            canvas.toBlob(function(blob) {
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    const base64data = reader.result.split(',')[1];  // Lấy dữ liệu base64
+                    const data = {
+                        image: base64data
+                    };
+
+                    console.log('Gửi dữ liệu hình ảnh:', data);  // Thêm log để kiểm tra dữ liệu gửi đi
+
+                    // Gửi ảnh lên server
+                    fetch('http://127.0.0.1:5000/upload_image', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => {
+                        // Kiểm tra xem server có phản hồi thành công không
+                        if (!response.ok) {
+                            throw new Error('Mã lỗi: ' + response.status);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Hiển thị kết quả từ server trong bảng
+                        document.getElementById('englishResult').innerHTML = data.english_text.replace(/\n/g, '<br>');
+                        document.getElementById('vietnameseResult').innerHTML = data.vietnamese_text.replace(/\n/g, '<br>');
+                    })
+                    .catch(error => {
+                        console.error('Lỗi:', error);
+                        document.getElementById('englishResult').innerHTML = 'Có lỗi xảy ra khi gửi yêu cầu.';
+                        document.getElementById('vietnameseResult').innerHTML = 'Có lỗi xảy ra khi gửi yêu cầu.';
+                    });
+                };
+                reader.readAsDataURL(blob);  // Chuyển đổi blob thành base64
+            });
+        });
+    </script>
+</body>
+</html>
