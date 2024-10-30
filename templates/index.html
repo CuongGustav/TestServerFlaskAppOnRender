@@ -44,7 +44,10 @@
     <div>
         <h1>Luồng Video Thời Gian Thực</h1>
     </div>
-    <img src="http://127.0.0.1:5000/video_feed" alt="Video Stream" id="videoStream" crossOrigin="anonymous">
+    
+    {% comment %} <img src="http://127.0.0.1:5000/video_feed" alt="Video Stream" id="videoStream" crossOrigin="anonymous"> {% endcomment %}
+    <img src="https://testserverflaskapponrender.onrender.com/video_feed" alt="Video Stream" id="videoStream" crossOrigin="anonymous">
+
 
     <button id="translateButton">Dịch</button>
 
@@ -90,7 +93,7 @@
                     console.log('Gửi dữ liệu hình ảnh:', data);  // Thêm log để kiểm tra dữ liệu gửi đi
 
                     // Gửi ảnh lên server
-                    fetch('http://127.0.0.1:5000/upload_image', {
+                    fetch('https://testserverflaskapponrender.onrender.com/upload_image', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
