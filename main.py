@@ -17,7 +17,7 @@ CORS(app)
 translator = Translator()
 
 # Đường dẫn RTSP của camera
-rtsp_url = 'rtsp://Cuonggustav@gmail.com:Cuongqb137@@192.168.2.30:554/stream1'
+rtsp_url = 'rtsp://Cuonggustav@gmail.com:Cuongqb137@@172.20.10.2:554/stream1'
 
 # Route chính
 @app.route('/')
