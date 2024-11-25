@@ -1,91 +1,95 @@
-# main.py
 import base64
-import os
 import io
-import cv2
+import json
 from PIL import Image
-from flask import Flask, Response, request, jsonify, render_template
-from googletrans import Translator
-import time
-from flask_cors import CORS  # Thêm vào để xử lý CORS
-from t import process_image  # Import hàm xử lý từ t.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from t import process_image  # Hàm xử lý từ t.py
 
 app = Flask(__name__)
 CORS(app)
 
-# Tạo một instance của Google Translator
-translator = Translator()
+# Tên file JSON để lưu kết quả
+RESULT_FILE = 'processed_results.json'
 
-# Đường dẫn RTSP của camera
-rtsp_url = 'rtsp://Cuonggustav:Cuongqb137@@192.168.2.30:554/stream1'
-
-# Route chính
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-# Tạo video stream từ camera
-def generate_video_stream():
-    print("Bắt đầu kết nối với camera...")
-    cap = cv2.VideoCapture(rtsp_url)
-    if not cap.isOpened():
-        print("Không thể mở kết nối với camera.")
-        return
-
-    print("Kết nối thành công. Bắt đầu phát video...")
-    while True:
-        success, frame = cap.read()
-        if not success:
-            print("Không thể đọc khung hình từ camera.")
-            break
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_video_stream(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
-
-@app.route('/upload_image', methods=['POST'])
-def upload_image():
-    print("Nhận yêu cầu từ client...")
-    data = request.json
-    print('Nhận dữ liệu từ client:', data)
-
-    if not data or 'image' not in data:
-        print("Không có dữ liệu hình ảnh nào được nhận.")
-        return jsonify({'message': 'No image data received'}), 400
-    
-    image_data = data['image']
-
-    # Decode hình ảnh từ chuỗi base64
+def save_to_json(data):
     try:
-        image = Image.open(io.BytesIO(base64.b64decode(image_data)))
-        print("Hình ảnh đã được giải mã thành công.")
+        with open(RESULT_FILE, 'w') as file:
+            json.dump(data, file, indent=4)
+        print(f"Kết quả đã được lưu vào {RESULT_FILE}.")
     except Exception as e:
-        print(f'Không thể giải mã hình ảnh: {e}')
-        return jsonify({'message': 'Failed to decode image', 'error': str(e)}), 400
+        print(f"Lỗi khi ghi file JSON: {e}")
 
-    # Gọi hàm xử lý hình ảnh từ t.py
-    result_english = process_image(image)
-    print("Văn bản tiếng Anh đã nhận diện:", result_english)
 
-    # Dịch văn bản từ tiếng Anh sang tiếng Việt
-    result_vietnamese = translator.translate(result_english, src='en', dest='vi').text
-    print("Văn bản tiếng Việt đã dịch:", result_vietnamese)
+def load_from_json():
+    try:
+        with open(RESULT_FILE, 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        print(f"File {RESULT_FILE} chưa tồn tại.")
+        return None
+    except Exception as e:
+        print(f"Lỗi khi đọc file JSON: {e}")
+        return None
 
-    # Trả về kết quả cho web client
-    return jsonify({
-        'message': 'Image received and processed successfully',
-        'english_text': result_english,
-        'vietnamese_text': result_vietnamese
-    })
+
+@app.route('/process_image', methods=['POST'])
+def process_image_endpoint():
+    print("Nhận yêu cầu từ client để xử lý hình ảnh...")
+
+    # Kiểm tra xem client gửi file hoặc Base64
+    image = None
+    if 'file' in request.files:
+        print("Nhận file ảnh từ client.")
+        file = request.files['file']
+        try:
+            # Đọc file ảnh (JPG, PNG)
+            image = Image.open(file)
+            print(f"Hình ảnh đã được load thành công từ file ({file.filename}).")
+        except Exception as e:
+            print(f'Lỗi khi đọc file ảnh: {e}')
+            return jsonify({'message': 'Error reading file', 'error': str(e)}), 400
+
+    elif 'image' in request.json:
+        print("Nhận chuỗi Base64 từ client.")
+        try:
+            image_data = request.json['image']
+            # Decode Base64 và đọc ảnh
+            image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+            print("Hình ảnh đã được giải mã thành công từ Base64.")
+        except Exception as e:
+            print(f'Lỗi khi giải mã Base64: {e}')
+            return jsonify({'message': 'Failed to decode Base64 image', 'error': str(e)}), 400
+    else:
+        print("Không nhận được dữ liệu hình ảnh hợp lệ.")
+        return jsonify({'message': 'No valid image data received'}), 400
+
+    # Gọi model xử lý hình ảnh
+    try:
+        result_english = process_image(image)
+        print("Văn bản tiếng Anh đã nhận diện:", result_english)
+
+        result_data = {'english_text': result_english}
+        save_to_json(result_data)
+
+    except Exception as e:
+        print(f'Lỗi khi xử lý hình ảnh: {e}')
+        return jsonify({'message': 'Error processing image', 'error': str(e)}), 500
+
+    return jsonify({'message': 'Image processed successfully', 'english_text': result_english}), 200
+
+
+@app.route('/get_result', methods=['GET'])
+def get_result():
+    print("Nhận yêu cầu lấy kết quả đã xử lý...")
+
+    result_data = load_from_json()
+    if not result_data:
+        print("Không có kết quả nào được lưu.")
+        return jsonify({'message': 'No processed results available'}), 404
+
+    return jsonify(result_data)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-# if __name__ == '__main__':
-#     port = int(os.environ.get("PORT", 5000))  # Lấy cổng từ biến môi trường, mặc định là 5000
-#     app.run(host='0.0.0.0', port=port)
